@@ -3,7 +3,7 @@ import pytest
 from pathlib import Path
 import json
 
-from project.app import app, init_db
+from project.app import app, db
 
 TEST_DB = "test.db"
 
@@ -13,10 +13,12 @@ def client():
     BASE_DIR = Path(__file__).resolve().parent.parent
     app.config["TESTING"] = True
     app.config["DATABASE"] = BASE_DIR.joinpath(TEST_DB)
+    app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{BASE_DIR.joinpath(TEST_DB)}"
 
-    init_db() # setup
-    yield app.test_client() # tests run here
-    init_db() # teardown
+    with app.app_context():
+        db.create_all()  # setup
+        yield app.test_client()  # tests run here
+        db.drop_all()  # teardown
 
 
 def login(client, username, password):
@@ -40,7 +42,7 @@ def test_index(client):
 
 def test_database(client):
     """initial test. ensure that the database exists"""
-    tester = Path("../test.db").is_file()
+    tester = Path("test.db").is_file()
     assert tester
 
 
@@ -73,6 +75,7 @@ def test_messages(client):
     assert b"No entries here so far" not in rv.data
     assert b"&lt;Hello&gt;" in rv.data
     assert b"<strong>HTML</strong> allowed here" in rv.data
+
 
 def test_delete_message(client):
     """Ensure the messages are being deleted"""
